@@ -1,0 +1,25 @@
+{
+  "name": "skywalker",
+  "version": "0.0.1",
+  "description": "Walks a directory tree and transforms loaded nodes",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/mutnt/skywalker.git"
+  },
+  "keywords": [
+    "fs",
+    "directory",
+    "walk",
+    "eventEmitter"
+  ],
+  "author": "xananax@mutnt.net",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mutnt/skywalker/issues"
+  },
+  "homepage": "https://github.com/mutnt/skywalker"
+}
