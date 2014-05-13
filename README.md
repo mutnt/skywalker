@@ -8,8 +8,7 @@ Can't believe skywalker was not already in use on npmjs.
 ### Usage
 
 ```js
-	var tree = require('skywalker');
-	tree('./somepath')
+	Tree('../puppeteer/sites')
 		.filter(/something/g,function(matches,next,done){
 			console.log('runs for all files or directories that match "something"',this._.path);
 			next()
@@ -28,7 +27,13 @@ Can't believe skywalker was not already in use on npmjs.
 		})
 		.filter(/(^|\/)_.*?$/g,function(matches,next,done){
 			console.log('rejects all files or directories that begin with "_"',this._.path);
-			done(false);
+			done(null,false);
+		})
+		.filter(/^(.*?)$/g,function(matches,next,done){
+			var _path = this._.path;
+			if(_path.match(/error/)){
+				done(new Error('this is an error'));	
+			}else{next()};
 		})
 		.extensionFilter('json',function(matches,next,done){
 			console.log('runs for all files that have a json extension',this._.path);
@@ -46,16 +51,23 @@ Can't believe skywalker was not already in use on npmjs.
 				next();
 			})
 		})
-		.on('file',function(file){
-			console.log('file event:',file._.path);
+		.on('file',function(file){console.log('file event:',file._.path);})
+		.on('directory',function(file){console.log('directory event:',file._.path);})
+		.on('done',function(file){console.log('-----------------------');})
+		.on('error',function(err){console.log('ERROR',err);})
+		.start(function(err,file){
+			if(err){return inspect(err);}
+			inspect(file);
 		})
-		.on('directory',function(file){
-			console.log('directory event:',file._.path);
-		})
-		.on('done',function(file){
-			console.log('-----------------------');
-		})
-		.start(function(file){
-			console.log(require('util').inspect(file, {showHidden:false,depth:4,colors:true}));
+```
+
+By default, skywalker does not emit errors so you do not have to handle errors both in the callback and the event;
+However, if you prefer event-style, do the following:
+
+```js
+		tree
+		.emitError(true)
+		.on('error',function(err){
+			console.log('error',err);
 		})
 ```

@@ -1,9 +1,18 @@
 var fs = require('fs')
 ,	path = require('path')
-,	extend = require('node.extend')
 ,	events = require('events')
 ,	EventEmitter = events.EventEmitter
+,	extend = require('node.extend')
 ,	util = require('util')
+,	inspect = function(){
+		var args = Array.prototype.slice.call(arguments);
+		if(!args.length){args = ['----------------'];}
+		var options = {showHidden:false,depth:4,colors:true};
+		for(var i = 0; i<args.length;i++){
+			args[i] = util.inspect(args[i],options);
+		}
+		console.log.apply(console,args);
+	}
 ;
 /**
 var RegexEscape = function(s) {
@@ -48,6 +57,7 @@ var events = {
 	FILE: 'file'
 ,	DIRECTORY: 'directory'
 ,	DONE: 'done'
+,	ERROR: 'error'
 }
 var types = {
 	FILE: 'file'
@@ -58,21 +68,32 @@ var Tree = function(filename){
 	EventEmitter.call(this);
 	this.filename = filename;
 	this.filters = [];
+	this._emitError = false;
 }
 util.inherits(Tree, EventEmitter);
-Tree.prototype.start = function(callback){
+Tree.prototype.start = function Start(callback){
 	var that = this;
-	this.process(this.filename,function(file){
+	this.process(this.filename,function(err,file){
+		if(err){
+			console.log('error')
+			if(that._emitError){that.emit(events.ERROR,err);}
+			if(callback){callback(err);}
+			return;
+		};
 		that.emit(events.DONE,file);
-		if(callback){callback(file);}
+		if(callback){callback(null,file);}
 	});
 	return this;
 }
-Tree.prototype.process = function(filename,cb){
+Tree.prototype.emitError = function EmitError(doEmit){
+	if(arguments.length){this._emitError = doEmit;}
+	return this;
+}
+Tree.prototype.process = function Process(filename,cb){
 	var file = new File(filename);
 	var that = this;
 	fs.lstat(file._.path,function(err,stats){
-		if(err){throw err;}
+		if(err){return cb(err);}
 		if(stats.isDirectory()){
 			file._.type = types.DIRECTORY;
 			file._.isDirectory = true;
@@ -85,44 +106,56 @@ Tree.prototype.process = function(filename,cb){
 	})
 	return this;
 }
-Tree.prototype.processDir = function(file,cb){
+Tree.prototype.processDir = function ProcessDir(file,cb){
 	var _path = file._.path;
 	var that = this;
 	fs.readdir(_path,function(err,files){
-		if(err){throw err;}
+		if(err){return cb(err);}
 		var i = 0
 		,	l = files.length
 		,	total = l
 		,	f
+		,	interrupt = false
+		,	error = function(err){
+				interrupt = true;
+				total = 0;
+				cb(err);
+			}
+		,	done = function Done(err,child){
+				if(interrupt){return;}
+				if(err){return error(err);}
+				if(child){
+					try{
+						file._.add(child._.name,child);
+						child._.parent.push(file._.path);
+					}catch(e){return error(err);}
+				}
+				total--;
+				if(total<=0){
+					that.processFilters(file,cb);
+				}
+			}
 		;
-		var done = function(child){
-			if(child){
-				file._.add(child._.name,child);
-				child._.parent.push(file._.path);
-			}
-			total--;
-			if(total==0){
-				that.processFilters(file,cb);
-			}
-		}
+
+		if(!total){done();}
 		for(i;i<total;i++){
 			f = files[i];
-			that.process(file._.path+'/'+f,done)
+			that.process(_path+'/'+f,done)
 		}
 	})
 	return this;
 }
-Tree.prototype.processFile = function(file,cb){
+Tree.prototype.processFile = function ProcessFile(file,cb){
 	this.processFilters(file,cb);
 	return this;
 }
-Tree.prototype.filter = function(regex,func,type){
+Tree.prototype.filter = function Filter(regex,func,type){
 	var that = this;
 	type = 
 		(type && type.match(/f|file/i))? types.FILE :
 		(type && type.match(/d|dir|directory|folder/i))? types.DIRECTORY :
 		false
-	var fn = function(file,next,done){
+	var fn = function Filter(file,next,done){
 		var _path = file._.path;
 		var _type = file._.type;
 		var m = _path.match(regex);
@@ -134,33 +167,42 @@ Tree.prototype.filter = function(regex,func,type){
 	this.filters.push(fn);
 	return this;
 }
-Tree.prototype.directoryFilter = function(regex,func){
+Tree.prototype.directoryFilter = function DirectoryFilter(regex,func){
 	return this.filter(regex,func,types.DIRECTORY)
 }
-Tree.prototype.fileFilter = function(regex,func){
+Tree.prototype.fileFilter = function FileFilter(regex,func){
 	return this.filter(regex,func,types.FILE)
 }
-Tree.prototype.extensionFilter = function(ext,func,type){
+Tree.prototype.extensionFilter = function ExtensionFilter(ext,func,type){
 	ext = new RegExp('\.'+ext+'$','i');
 	type = type || types.FILE;
 	return this.filter(ext,func,type)
 }
-Tree.prototype.processFilters = function(file,callback){
+Tree.prototype.processFilters = function ProcessFilters(file,callback){
 	var i = 0
 	,	filters = this.filters
 	,	l = filters.length
 	,	that = this
 	,	isDone = false
-	,	done = function(replace){
-			if(arguments.length){file = replace;}
+	,	interrupt = false
+	,	error = function(err){
+			interrupt = true;
+			isDone = true;
+			callback(err);
+		}
+	,	done = function Done(err,replace){
+			if(interrupt){return;}
+			if(err){error(err);}
+			if(arguments.length>1){file = replace;}
 			if(!isDone){
 				isDone = true;
-				callback(file);
+				callback(null,file);
 			}
 		}
-	,	next = function(){
+	,	next = function Next(){
+			if(interrupt){return;}
 			if(i==l){
-				return callback(file);
+				return done();
 			}
 			filters[i++].call(that,file,next,done);
 		}
@@ -172,8 +214,8 @@ Tree.events = events;
 
 module.exports = Tree;
 
-/**
-	Tree('../sites')
+/** /
+	Tree('../puppeteer/sites')
 		.filter(/something/g,function(matches,next,done){
 			console.log('runs for all files or directories that match "something"',this._.path);
 			next()
@@ -192,7 +234,13 @@ module.exports = Tree;
 		})
 		.filter(/(^|\/)_.*?$/g,function(matches,next,done){
 			console.log('rejects all files or directories that begin with "_"',this._.path);
-			done(false);
+			done(null,false);
+		})
+		.filter(/^(.*?)$/g,function(matches,next,done){
+			var _path = this._.path;
+			if(_path.match(/error/)){
+				done(new Error('this is an error'));	
+			}else{next()};
 		})
 		.extensionFilter('json',function(matches,next,done){
 			console.log('runs for all files that have a json extension',this._.path);
@@ -210,16 +258,12 @@ module.exports = Tree;
 				next();
 			})
 		})
-		.on('file',function(file){
-			console.log('file event:',file._.path);
+		.on('file',function(file){console.log('file event:',file._.path);})
+		.on('directory',function(file){console.log('directory event:',file._.path);})
+		.on('done',function(file){console.log('-----------------------');})
+		.on('error',function(err){console.log('ERROR',err);})
+		.start(function(err,file){
+			if(err){return inspect(err);}
+			inspect(file);
 		})
-		.on('directory',function(file){
-			console.log('directory event:',file._.path);
-		})
-		.on('done',function(file){
-			console.log('-----------------------');
-		})
-		.start(function(file){
-			console.log(require('util').inspect(file, {showHidden:false,depth:4,colors:true}));
-		})
-**/
+/**/

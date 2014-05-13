@@ -1,6 +1,6 @@
 {
   "name": "skywalker",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Walks a directory tree and transforms loaded nodes",
   "main": "index.js",
   "scripts": {
@@ -21,5 +21,8 @@
   "bugs": {
     "url": "https://github.com/mutnt/skywalker/issues"
   },
-  "homepage": "https://github.com/mutnt/skywalker"
+  "homepage": "https://github.com/mutnt/skywalker",
+  "dependencies": {
+    "node.extend": "^1.0.10"
+  }
 }
