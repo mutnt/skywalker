@@ -38,6 +38,7 @@ var Infoadd = function(name,obj){
 var Info = function(filename,file){
 	if(!(this instanceof Info)){return new Info(filename,file);}
 	this.path = filename;
+	this.dirname = path.dirname(filename);
 	this.filename = path.basename(filename);
 	this.extension = path.extname(this.filename).replace('.','');
 	this.name = path.basename(this.filename,'.'+this.extension);
