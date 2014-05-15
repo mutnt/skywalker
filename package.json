@@ -1,6 +1,6 @@
 {
   "name": "skywalker",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Walks a directory tree and transforms loaded nodes",
   "main": "index.js",
   "scripts": {

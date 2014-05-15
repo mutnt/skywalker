@@ -118,3 +118,15 @@ The default toString() function outputs the file's path, but if you set content 
 ```
 
 Then this is what toString will output.
+
+
+To detect mimetypes, skywalker uses [node-mime](https://github.com/broofa/node-mime). It is made available on the 
+
+```js
+	Tree.mime
+	//define a new mime-type:
+	Tree.mime.define({
+		'text/jade':['jade']
+	})
+```
+namespace.
